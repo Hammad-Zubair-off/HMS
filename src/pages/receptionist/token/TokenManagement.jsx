@@ -1,0 +1,496 @@
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import LogoutButton from '../../../components/LogoutButton'
+import {
+  Hash,
+  User,
+  Calendar,
+  Clock,
+  Phone,
+  Mail,
+  CheckCircle,
+  AlertCircle,
+  Clock as ClockIcon,
+  ArrowLeft,
+  RefreshCw,
+  Printer,
+  Eye,
+  Search,
+  Filter
+} from 'lucide-react'
+import { collection, onSnapshot, query, where, updateDoc, doc } from 'firebase/firestore'
+import { db } from '../../../firebase/config'
+
+export default function TokenManagement() {
+  const [appointments, setAppointments] = useState([])
+  const [filteredAppointments, setFilteredAppointments] = useState([])
+  const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'))
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [loading, setLoading] = useState(false)
+  const [nextTokenNumber, setNextTokenNumber] = useState(1)
+
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      if (!selectedDate) return
+
+      setLoading(true)
+      try {
+        const appointmentsRef = collection(db, 'appointments')
+        // Query broadly and filter client-side due to mixed date formats (string vs Timestamp)
+        const q = query(appointmentsRef)
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          const appointmentsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })).filter(apt => {
+            // Robust date filtering
+            let aptDateStr = ''
+            if (apt.date && typeof apt.date.toDate === 'function') {
+              aptDateStr = apt.date.toDate().toISOString().split('T')[0]
+            } else if (apt.appointmentDate) {
+              aptDateStr = apt.appointmentDate
+            } else if (apt.date && typeof apt.date === 'string') {
+              aptDateStr = apt.date.split('T')[0]
+            }
+            return aptDateStr === selectedDate
+          })
+
+          const sortedAppointments = appointmentsData.sort((a, b) => {
+            if (a.tokenNumber && b.tokenNumber) {
+              return a.tokenNumber - b.tokenNumber
+            }
+            if (a.tokenNumber) return -1
+            if (b.tokenNumber) return 1
+            const dateA = new Date(a.createdAt || 0)
+            const dateB = new Date(b.createdAt || 0)
+            return dateA - dateB
+          })
+
+          setAppointments(sortedAppointments)
+          setFilteredAppointments(sortedAppointments)
+
+          const maxToken = sortedAppointments.reduce((max, apt) => {
+            return apt.tokenNumber && apt.tokenNumber > max ? apt.tokenNumber : max
+          }, 0)
+          setNextTokenNumber(maxToken + 1)
+        }, (error) => {
+          console.error('Error fetching appointments:', error)
+          toast.error('Error loading appointments')
+        })
+
+        return () => unsubscribe()
+      } catch (error) {
+        console.error('Error fetching appointments:', error)
+        toast.error('Error loading appointments')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAppointments()
+  }, [selectedDate])
+
+  useEffect(() => {
+    let filtered = appointments
+
+    if (searchTerm) {
+      filtered = filtered.filter(appointment =>
+        appointment.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        appointment.patientPhone.includes(searchTerm) ||
+        (appointment.tokenNumber && appointment.tokenNumber.toString().includes(searchTerm))
+      )
+    }
+
+    if (filterStatus !== 'all') {
+      filtered = filtered.filter(appointment => appointment.status === filterStatus)
+    }
+
+    setFilteredAppointments(filtered)
+  }, [appointments, searchTerm, filterStatus])
+
+  const generateToken = async (appointmentId) => {
+    try {
+      const appointmentRef = doc(db, 'appointments', appointmentId)
+
+      await updateDoc(appointmentRef, {
+        tokenNumber: nextTokenNumber,
+        tokenGeneratedAt: new Date().toISOString(),
+        status: 'token_generated'
+      })
+
+      toast.success(`Token ${nextTokenNumber} generated successfully!`)
+      setNextTokenNumber(prev => prev + 1)
+    } catch (error) {
+      console.error('Error generating token:', error)
+      toast.error('Error generating token')
+    }
+  }
+
+  const updateAppointmentStatus = async (appointmentId, newStatus) => {
+    try {
+      const appointmentRef = doc(db, 'appointments', appointmentId)
+      await updateDoc(appointmentRef, {
+        status: newStatus,
+        updatedAt: new Date().toISOString()
+      })
+
+      toast.success(`Appointment status updated to ${newStatus}`)
+    } catch (error) {
+      console.error('Error updating appointment status:', error)
+      toast.error('Error updating appointment status')
+    }
+  }
+
+  const printToken = (appointment) => {
+    const printWindow = window.open('', '_blank')
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Token ${appointment.tokenNumber}</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+            .token { font-size: 48px; font-weight: bold; color: #06b6d4; margin: 20px 0; }
+            .patient-info { margin: 20px 0; }
+            .appointment-info { margin: 20px 0; color: #666; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>Patient Token</h1>
+          <div class="token">${appointment.tokenNumber}</div>
+          <div class="patient-info">
+            <h2>${appointment.patientName}</h2>
+            <p>Age: ${appointment.patientAge} | Gender: ${appointment.patientGender}</p>
+            <p>Phone: ${appointment.patientPhone}</p>
+          </div>
+          <div class="appointment-info">
+            <p>Date: ${appointment.appointmentDate}</p>
+            <p>Time: ${appointment.appointmentTime}</p>
+            <p>Doctor: ${appointment.doctorName}</p>
+          </div>
+          <p>Generated at: ${new Date().toLocaleString()}</p>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.print()
+  }
+
+  const getStatusInfo = (status) => {
+    switch (status) {
+      case 'scheduled':
+        return { badge: 'info', icon: ClockIcon }
+      case 'token_generated':
+        return { badge: 'warning', icon: CheckCircle }
+      case 'in_progress':
+        return { badge: 'info', icon: AlertCircle }
+      case 'completed':
+        return { badge: 'success', icon: CheckCircle }
+      case 'cancelled':
+        return { badge: 'error', icon: AlertCircle }
+      default:
+        return { badge: 'pending', icon: ClockIcon }
+    }
+  }
+
+  const getTodayDisplay = () => {
+    const today = new Date()
+    return today.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+
+  return (
+    <div className="dashboard-container">
+      {/* Premium Navigation Bar */}
+      <header className="nav-bar">
+        <div className="nav-bar-content">
+          <div className="flex items-center space-x-4">
+
+            <div className="stat-card-icon stat-card-icon-primary">
+              <Hash className="icon-lg" />
+            </div>
+            <div>
+              <h1 className="nav-bar-title">Token Management</h1>
+              <p className="text-sm text-slate-300">Manage patient tokens for today's appointments</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/receptionist"
+              className="btn-outline rounded-lg btn-md flex"
+            >
+              {/* <ArrowLeft className="icon-sm" /> */}
+              <span>Back to Dashboard</span>
+            </Link>
+            <LogoutButton />
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="page-container">
+        {/* Page Header */}
+        <div className="page-header">
+          <h1 className="page-title">Token Management</h1>
+          <p className="page-description">Generate and manage patient queue tokens</p>
+        </div>
+
+        {/* Stats Card */}
+        <div className="grid-stats mb-6">
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-card-icon stat-card-icon-primary">
+                <Calendar className="icon-lg" />
+              </div>
+            </div>
+            <p className="stat-card-title">Total Appointments</p>
+            <p className="stat-card-value">{appointments.length}</p>
+            <p className="text-muted text-sm mt-1">{getTodayDisplay()}</p>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-card-icon stat-card-icon-secondary">
+                <Hash className="icon-lg" />
+              </div>
+            </div>
+            <p className="stat-card-title">Tokens Generated</p>
+            <p className="stat-card-value">
+              {appointments.filter(apt => apt.tokenNumber).length}
+            </p>
+            <p className="text-muted text-sm mt-1">Active tokens</p>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-card-icon stat-card-icon-amber">
+                <ClockIcon className="icon-lg" />
+              </div>
+            </div>
+            <p className="stat-card-title">In Progress</p>
+            <p className="stat-card-value">
+              {appointments.filter(apt => apt.status === 'in_progress').length}
+            </p>
+            <p className="text-muted text-sm mt-1">Currently serving</p>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-card-header">
+              <div className="stat-card-icon stat-card-icon-success">
+                <CheckCircle className="icon-lg" />
+              </div>
+            </div>
+            <p className="stat-card-title">Completed</p>
+            <p className="stat-card-value">
+              {appointments.filter(apt => apt.status === 'completed').length}
+            </p>
+            <p className="text-muted text-sm mt-1">Finished today</p>
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="card mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 md:flex-[3]">
+              <input
+                type="text"
+                placeholder="Search by patient name, phone, or token number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="search-input form-input"
+              />
+            </div>
+
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="form-input md:flex-1"
+            >
+              <option value="all">All Status</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="token_generated">Token Generated</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="form-input md:flex-1"
+            />
+          </div>
+        </div>
+
+        {/* Appointments Table */}
+        <div className="card">
+          <div className="section-header mb-6">
+            <div>
+              <h2 className="section-title">Appointments Queue</h2>
+              <p className="section-subtitle">Manage tokens and appointment status</p>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="table-empty">
+              <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+              <p className="table-empty-text">Loading appointments...</p>
+            </div>
+          ) : filteredAppointments.length === 0 ? (
+            <div className="table-empty">
+              <AlertCircle className="icon-xl text-muted mx-auto mb-4" />
+              <p className="table-empty-text">
+                {searchTerm || filterStatus !== 'all'
+                  ? 'Try adjusting your search or filters.'
+                  : 'No appointments scheduled for the selected date.'}
+              </p>
+            </div>
+          ) : (
+            <div className="table-container">
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead className="table-header">
+                    <tr className="table-header-row">
+                      <th className="table-header-cell">Token</th>
+                      <th className="table-header-cell">Patient</th>
+                      <th className="table-header-cell">Contact</th>
+                      <th className="table-header-cell">Appointment</th>
+                      <th className="table-header-cell">Status</th>
+                      <th className="table-header-cell">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="table-body">
+                    {filteredAppointments.map((appointment) => {
+                      const statusInfo = getStatusInfo(appointment.status)
+                      const StatusIcon = statusInfo.icon
+
+                      return (
+                        <tr key={appointment.id} className="table-row">
+                          <td className="table-cell">
+                            {appointment.tokenNumber ? (
+                              <div className="flex items-center gap-3">
+                                <div className="stat-card-icon stat-card-icon-primary">
+                                  <span className="text-xl font-bold text-white">
+                                    {appointment.tokenNumber}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => printToken(appointment)}
+                                  className="btn-icon btn-ghost"
+                                  title="Print Token"
+                                >
+                                  <Printer className="icon-sm" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-muted">-</span>
+                            )}
+                          </td>
+
+                          <td className="table-cell">
+                            <div>
+                              <p className="table-cell-header">{appointment.patientName}</p>
+                              <p className="text-xs text-muted">
+                                {appointment.patientAge} years, {appointment.patientGender}
+                              </p>
+                            </div>
+                          </td>
+
+                          <td className="table-cell">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Phone className="icon-sm text-muted" />
+                                <span>{appointment.patientPhone}</span>
+                              </div>
+                              {appointment.patientEmail && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Mail className="icon-sm text-muted" />
+                                  <span className="text-muted text-xs">{appointment.patientEmail}</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="table-cell">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Calendar className="icon-sm text-muted" />
+                                <span>{appointment.appointmentDate}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <Clock className="icon-sm text-muted" />
+                                <span className="text-muted">{appointment.appointmentTime}</span>
+                              </div>
+                              <p className="text-sm text-muted">{appointment.doctorName}</p>
+                            </div>
+                          </td>
+
+                          <td className="table-cell">
+                            <span className={`badge-${statusInfo.badge} flex items-center  gap-1 w-fit`}>
+                              <StatusIcon className="icon-xs" />
+                              {appointment.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </span>
+                          </td>
+
+                          <td className="table-cell">
+                            <div className="flex items-center gap-2">
+                              {!appointment.tokenNumber && (
+                                <button
+                                  onClick={() => generateToken(appointment.id)}
+                                  className="btn-primary rounded-lg border btn-sm"
+                                  title="Generate Token"
+                                >
+                                  Generate Token
+                                </button>
+                              )}
+
+                              {appointment.tokenNumber && appointment.status === 'token_generated' && (
+                                <button
+                                  onClick={() => updateAppointmentStatus(appointment.id, 'in_progress')}
+                                  className="btn-secondary rounded-lg border btn-sm"
+                                  title="Mark In Progress"
+                                >
+                                  Start Consultation
+                                </button>
+                              )}
+
+                              {appointment.status === 'in_progress' && (
+                                <button
+                                  onClick={() => updateAppointmentStatus(appointment.id, 'completed')}
+                                  className="btn-success rounded-lg border btn-sm"
+                                  title="Mark Completed"
+                                >
+                                  Complete
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => updateAppointmentStatus(appointment.id, 'cancelled')}
+                                className="btn-danger rounded-lg border btn-sm"
+                                title="Cancel Appointment"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  )
+}
