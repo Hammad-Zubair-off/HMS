@@ -79,48 +79,6 @@ Our clinic management system is built with cutting-edge technologies to ensure p
 - **Toast Notifications** for user feedback
 - **Search & Filter** capabilities throughout
 
-## 🌟 Live Demo
-
-Experience the application live at: **[life-clinic-management-system.vercel.app](https://life-clinic-management-system.vercel.app)**
-
-### 🧪 Test Accounts
-- **Doctor**: Create a new account with Doctor role
-- **Receptionist**: Create a new account with Receptionist role
-
-## 📸 Application Preview
-
-Here's a comprehensive preview of all the key features and interfaces in the ClinicFlow Management System:
-
-| Feature | Preview |
-|:--------:|:-------:|
-| **Authentication** | ![Login Interface](preview/login.png) |
-| **User Registration** | ![Signup Interface](preview/signup.png) |
-| **Doctor Dashboard** | ![Doctor Dashboard](preview/doctor_dashboard.png) |
-| **Doctor Appointments** | ![Doctor Patient Appointments](preview/doctor_patient_appointment.png) |
-| **Doctor Patient Queue** | ![Doctor Patient Queue](preview/doctor_patient_queue.png) |
-| **Doctor Prescriptions** | ![Doctor Prescriptions](preview/doctor_prescription.png) |
-| **Doctor Medicine Management** | ![Doctor Medicine Management](preview/doctor_medicine.png) |
-| **Receptionist Dashboard** | ![Receptionist Dashboard](preview/receptionist_dashboard.png) |
-| **Receptionist Appointments** | ![Receptionist Appointments](preview/receptionist_appointment.png) |
-| **Receptionist Token Management** | ![Receptionist Token Management](preview/receptionist_tokens.png) |
-| **Receptionist Prescriptions** | ![Receptionist Prescriptions](preview/receptionist_prescription.png) |
-| **Receptionist Billing** | ![Receptionist Billing](preview/receptionist_billing.png) |
-| **Receptionist Billing Reports** | ![Receptionist Billing Reports](preview/receptionist_billing_report.png) |
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-- Firebase project
-
-### 1. Clone and Install
-```bash
-git clone https://github.com/dhruvpatel16120/clinic-management-system.git
-cd clinic-management-system
-npm install
-```
-
 ### 2. Firebase Setup
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Create a new project or select existing one
