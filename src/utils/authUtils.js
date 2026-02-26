@@ -69,21 +69,7 @@ export async function resetUserPassword(email) {
 }
 
 export async function resendUserVerificationEmail(user) {
-  const actionCodeSettings = {
-    url: `${window.location.origin}/login`,
-    handleCodeInApp: true,
-    iOS: {
-      bundleId: 'com.clinicmanagement.app'
-    },
-    android: {
-      packageName: 'com.clinicmanagement.app',
-      installApp: true,
-      minimumVersion: '12'
-    },
-    dynamicLinkDomain: import.meta.env.VITE_FIREBASE_DYNAMIC_LINK_DOMAIN || undefined
-  }
-  
-  return await sendEmailVerification(user, actionCodeSettings)
+  return await sendEmailVerification(user)
 }
 
 export async function fetchUserRoleFromFirestore(uid) {
