@@ -28,8 +28,8 @@
 
 // export default app
 import { initializeApp } from "firebase/app";
-import { getAuth, connectAuthEmulator } from "firebase/auth";
-import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB-72oeIGetQLSMtuJ0nxAwFkiiXGnLNZc",
@@ -39,17 +39,10 @@ const firebaseConfig = {
   messagingSenderId: "720768878063",
   appId: "1:720768878063:web:f346dff16b435a00d1a21a"
 };
-// Initialize Firebase
+
 const app = initializeApp(firebaseConfig);
 
-// Initialize services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-
-// Connect emulators (100% free, no billing)
-if (location.hostname === "localhost") {
-  connectAuthEmulator(auth, "http://127.0.0.1:9099");
-  connectFirestoreEmulator(db, "127.0.0.1", 8080);
-}
 
 export default app;
