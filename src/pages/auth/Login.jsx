@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FaHospital, FaEnvelope, FaLock, FaEye, FaEyeSlash, FaArrowRight, FaStar, FaShieldHalved, FaUserDoctor, FaUserTie, FaDatabase } from 'react-icons/fa6'
 import { useAuth } from '../../hooks/useAuth'
@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 
 export default function Login() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, currentUser, userRole: contextRole } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [selectedRole, setSelectedRole] = useState('')
   const [email, setEmail] = useState('')
@@ -16,6 +16,17 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [isSeeding, setIsSeeding] = useState(false)
+
+  // Auto-redirect if already authenticated
+  useEffect(() => {
+    if (currentUser && contextRole) {
+      if (contextRole === 'doctor') {
+        navigate('/doctor', { replace: true })
+      } else if (contextRole === 'receptionist') {
+        navigate('/receptionist', { replace: true })
+      }
+    }
+  }, [currentUser, contextRole, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()

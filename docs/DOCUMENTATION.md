@@ -250,7 +250,7 @@ npm run dev
 
 ##### 8.1 Create Admin Account
 1. Click **"Sign Up"** on the home page
-2. Choose **"Doctor"** or **"Receptionist"** role
+2. Choose **"Doctor"** or **" "** role
 3. Fill in your details:
    - Full Name: `Admin User`
    - Email: `admin@clinic.com`

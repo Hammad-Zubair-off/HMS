@@ -52,6 +52,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true)
       if (user) {
         setCurrentUser(user)
         const role = await fetchUserRole(user.uid)

@@ -19,8 +19,9 @@ import {
   Search,
   Filter
 } from 'lucide-react'
-import { collection, onSnapshot, query, where, updateDoc, doc } from 'firebase/firestore'
+import { collection, onSnapshot, query, updateDoc, doc } from 'firebase/firestore'
 import { db } from '../../../firebase/config'
+import { getDateString, getDateObject, getDisplayDate, getDisplayTime } from '../../../utils/firestoreUtils'
 
 export default function TokenManagement() {
   const [appointments, setAppointments] = useState([])
@@ -32,80 +33,67 @@ export default function TokenManagement() {
   const [nextTokenNumber, setNextTokenNumber] = useState(1)
 
   useEffect(() => {
-    const fetchAppointments = async () => {
-      if (!selectedDate) return
+    if (!selectedDate) return
 
-      setLoading(true)
-      try {
-        const appointmentsRef = collection(db, 'appointments')
-        // Query broadly and filter client-side due to mixed date formats (string vs Timestamp)
-        const q = query(appointmentsRef)
+    setLoading(true)
+    const appointmentsRef = collection(db, 'appointments')
+    const q = query(appointmentsRef)
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-          const appointmentsData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })).filter(apt => {
-            // Robust date filtering
-            let aptDateStr = ''
-            if (apt.date && typeof apt.date.toDate === 'function') {
-              aptDateStr = apt.date.toDate().toISOString().split('T')[0]
-            } else if (apt.appointmentDate) {
-              aptDateStr = apt.appointmentDate
-            } else if (apt.date && typeof apt.date === 'string') {
-              aptDateStr = apt.date.split('T')[0]
-            }
-            return aptDateStr === selectedDate
-          })
-
-          const sortedAppointments = appointmentsData.sort((a, b) => {
-            if (a.tokenNumber && b.tokenNumber) {
-              return a.tokenNumber - b.tokenNumber
-            }
-            if (a.tokenNumber) return -1
-            if (b.tokenNumber) return 1
-            const dateA = new Date(a.createdAt || 0)
-            const dateB = new Date(b.createdAt || 0)
-            return dateA - dateB
-          })
-
-          setAppointments(sortedAppointments)
-          setFilteredAppointments(sortedAppointments)
-
-          const maxToken = sortedAppointments.reduce((max, apt) => {
-            return apt.tokenNumber && apt.tokenNumber > max ? apt.tokenNumber : max
-          }, 0)
-          setNextTokenNumber(maxToken + 1)
-        }, (error) => {
-          console.error('Error fetching appointments:', error)
-          toast.error('Error loading appointments')
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const selectedNorm = (selectedDate || '').split('T')[0]
+      const raw = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      const appointmentsData = raw
+        .filter(apt => {
+          const aptDateStr = getDateString(apt.date ?? apt.appointmentDate)
+          return (aptDateStr || '').split('T')[0] === selectedNorm
         })
+        .map(apt => ({
+          ...apt,
+          appointmentDate: getDateString(apt.date ?? apt.appointmentDate) || apt.appointmentDate || '',
+          appointmentDateDisplay: getDisplayDate(apt.date ?? apt.appointmentDate) || apt.appointmentDate || '',
+          appointmentTimeDisplay: getDisplayTime(apt.appointmentTime ?? apt.time) || apt.appointmentTime || ''
+        }))
 
-        return () => unsubscribe()
-      } catch (error) {
-        console.error('Error fetching appointments:', error)
-        toast.error('Error loading appointments')
-      } finally {
-        setLoading(false)
-      }
-    }
+      const sortedAppointments = appointmentsData.sort((a, b) => {
+        if (a.tokenNumber != null && b.tokenNumber != null) return a.tokenNumber - b.tokenNumber
+        if (a.tokenNumber != null) return -1
+        if (b.tokenNumber != null) return 1
+        const dateA = getDateObject(a.createdAt) || new Date(0)
+        const dateB = getDateObject(b.createdAt) || new Date(0)
+        return (dateA?.getTime?.() || 0) - (dateB?.getTime?.() || 0)
+      })
 
-    fetchAppointments()
+      setAppointments(sortedAppointments)
+      setFilteredAppointments(sortedAppointments)
+
+      const maxToken = sortedAppointments.reduce((max, apt) => {
+        return apt.tokenNumber != null && apt.tokenNumber > max ? apt.tokenNumber : max
+      }, 0)
+      setNextTokenNumber(maxToken + 1)
+      setLoading(false)
+    }, (error) => {
+      console.error('Error fetching appointments:', error)
+      toast.error('Error loading appointments')
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
   }, [selectedDate])
 
   useEffect(() => {
     let filtered = appointments
+    const term = (searchTerm || '').toLowerCase().trim()
 
-    if (searchTerm) {
+    if (term) {
       filtered = filtered.filter(appointment =>
-        appointment.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        appointment.patientPhone.includes(searchTerm) ||
-        (appointment.tokenNumber && appointment.tokenNumber.toString().includes(searchTerm))
+        (appointment.patientName || '').toLowerCase().includes(term) ||
+        (appointment.patientPhone || '').includes(searchTerm) ||
+        (appointment.tokenNumber != null && String(appointment.tokenNumber).includes(searchTerm))
       )
     }
 
     if (filterStatus !== 'all') {
-      filtered = filtered.filter(appointment => appointment.status === filterStatus)
+      filtered = filtered.filter(appointment => (appointment.status || '') === filterStatus)
     }
 
     setFilteredAppointments(filtered)
@@ -145,11 +133,13 @@ export default function TokenManagement() {
   }
 
   const printToken = (appointment) => {
+    const dateDisplay = appointment.appointmentDateDisplay ?? appointment.appointmentDate ?? ''
+    const timeDisplay = appointment.appointmentTimeDisplay ?? appointment.appointmentTime ?? ''
     const printWindow = window.open('', '_blank')
     printWindow.document.write(`
       <html>
         <head>
-          <title>Token ${appointment.tokenNumber}</title>
+          <title>Token ${appointment.tokenNumber ?? ''}</title>
           <style>
             body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
             .token { font-size: 48px; font-weight: bold; color: #06b6d4; margin: 20px 0; }
@@ -160,16 +150,16 @@ export default function TokenManagement() {
         </head>
         <body>
           <h1>Patient Token</h1>
-          <div class="token">${appointment.tokenNumber}</div>
+          <div class="token">${appointment.tokenNumber ?? '-'}</div>
           <div class="patient-info">
-            <h2>${appointment.patientName}</h2>
-            <p>Age: ${appointment.patientAge} | Gender: ${appointment.patientGender}</p>
-            <p>Phone: ${appointment.patientPhone}</p>
+            <h2>${(appointment.patientName || '').replace(/</g, '&lt;')}</h2>
+            <p>Age: ${appointment.patientAge ?? 'N/A'} | Gender: ${appointment.patientGender ?? 'N/A'}</p>
+            <p>Phone: ${(appointment.patientPhone || '').replace(/</g, '&lt;')}</p>
           </div>
           <div class="appointment-info">
-            <p>Date: ${appointment.appointmentDate}</p>
-            <p>Time: ${appointment.appointmentTime}</p>
-            <p>Doctor: ${appointment.doctorName}</p>
+            <p>Date: ${dateDisplay}</p>
+            <p>Time: ${timeDisplay}</p>
+            <p>Doctor: ${(appointment.doctorName || '').replace(/</g, '&lt;')}</p>
           </div>
           <p>Generated at: ${new Date().toLocaleString()}</p>
         </body>
@@ -397,9 +387,9 @@ export default function TokenManagement() {
 
                           <td className="table-cell">
                             <div>
-                              <p className="table-cell-header">{appointment.patientName}</p>
+                              <p className="table-cell-header">{appointment.patientName || '—'}</p>
                               <p className="text-xs text-muted">
-                                {appointment.patientAge} years, {appointment.patientGender}
+                                {appointment.patientAge ?? '—'} years, {appointment.patientGender ?? '—'}
                               </p>
                             </div>
                           </td>
@@ -408,9 +398,9 @@ export default function TokenManagement() {
                             <div className="space-y-1">
                               <div className="flex items-center gap-2 text-sm">
                                 <Phone className="icon-sm text-muted" />
-                                <span>{appointment.patientPhone}</span>
+                                <span>{appointment.patientPhone ?? '—'}</span>
                               </div>
-                              {appointment.patientEmail && (
+                              {(appointment.patientEmail != null && appointment.patientEmail !== '') && (
                                 <div className="flex items-center gap-2 text-sm">
                                   <Mail className="icon-sm text-muted" />
                                   <span className="text-muted text-xs">{appointment.patientEmail}</span>
@@ -423,20 +413,20 @@ export default function TokenManagement() {
                             <div className="space-y-1">
                               <div className="flex items-center gap-2 text-sm">
                                 <Calendar className="icon-sm text-muted" />
-                                <span>{appointment.appointmentDate}</span>
+                                <span>{appointment.appointmentDateDisplay ?? appointment.appointmentDate ?? '—'}</span>
                               </div>
                               <div className="flex items-center gap-2 text-sm">
                                 <Clock className="icon-sm text-muted" />
-                                <span className="text-muted">{appointment.appointmentTime}</span>
+                                <span className="text-muted">{appointment.appointmentTimeDisplay ?? appointment.appointmentTime ?? '—'}</span>
                               </div>
-                              <p className="text-sm text-muted">{appointment.doctorName}</p>
+                              <p className="text-sm text-muted">{appointment.doctorName ?? '—'}</p>
                             </div>
                           </td>
 
                           <td className="table-cell">
-                            <span className={`badge-${statusInfo.badge} flex items-center  gap-1 w-fit`}>
+                            <span className={`badge-${statusInfo.badge} flex items-center gap-1 w-fit`}>
                               <StatusIcon className="icon-xs" />
-                              {appointment.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              {(appointment.status || 'scheduled').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                             </span>
                           </td>
 

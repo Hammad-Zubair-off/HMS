@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { doc, getDoc, collection, query, where, onSnapshot, orderBy } from 'firebase/firestore'
 import { db } from '../../../firebase/config'
+import { getDisplayDate, getDisplayTime } from '../../../utils/firestoreUtils'
 
 export default function ViewPatient() {
   const { currentUser } = useAuth()
@@ -486,9 +487,9 @@ export default function ViewPatient() {
                   <tbody className="table-body">
                     {appointments.map((appointment) => (
                       <tr key={appointment.id} className="table-row">
-                        <td className="table-cell">{appointment.appointmentDate}</td>
-                        <td className="table-cell">{appointment.appointmentTime}</td>
-                        <td className="table-cell">{appointment.doctorName}</td>
+                        <td className="table-cell">{getDisplayDate(appointment.date ?? appointment.appointmentDate) || appointment.appointmentDate || '—'}</td>
+                        <td className="table-cell">{getDisplayTime(appointment.appointmentTime ?? appointment.time) || appointment.appointmentTime || '—'}</td>
+                        <td className="table-cell">{appointment.doctorName ?? '—'}</td>
                         <td className="table-cell">{appointment.appointmentType}</td>
                         <td className="table-cell">
                           <span className={`badge ${getStatusBadge(appointment.status)}`}>

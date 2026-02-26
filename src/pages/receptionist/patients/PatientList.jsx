@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { collection, onSnapshot, query, orderBy, deleteDoc, doc } from 'firebase/firestore'
 import { db } from '../../../firebase/config'
+import { getDateObject } from '../../../utils/firestoreUtils'
 
 export default function PatientList() {
   const { currentUser } = useAuth()
@@ -28,17 +29,21 @@ export default function PatientList() {
   const [filterGender, setFilterGender] = useState('all')
   const [loading, setLoading] = useState(false)
 
-  // Fetch patients
+  // Fetch patients (normalize dates for display; sort client-side if createdAt is mixed string/Timestamp)
   useEffect(() => {
     setLoading(true)
     const patientsRef = collection(db, 'patients')
     const q = query(patientsRef, orderBy('createdAt', 'desc'))
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const patientsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
+      const patientsData = snapshot.docs.map(docSnap => {
+        const d = { id: docSnap.id, ...docSnap.data() }
+        return {
+          ...d,
+          createdAtDisplay: getDateObject(d.createdAt),
+          dateOfBirthDisplay: getDateObject(d.dateOfBirth)
+        }
+      })
       setPatients(patientsData)
       setFilteredPatients(patientsData)
       setLoading(false)
@@ -87,10 +92,10 @@ export default function PatientList() {
     }
   }
 
-  const getAge = (dateOfBirth) => {
-    if (!dateOfBirth) return 'N/A'
+  const getAge = (patient) => {
+    const birthDate = getDateObject(patient?.dateOfBirth) || (patient?.dateOfBirthDisplay ?? null)
+    if (!birthDate || isNaN(birthDate.getTime())) return 'N/A'
     const today = new Date()
-    const birthDate = new Date(dateOfBirth)
     let age = today.getFullYear() - birthDate.getFullYear()
     const monthDiff = today.getMonth() - birthDate.getMonth()
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
@@ -176,7 +181,8 @@ export default function PatientList() {
             <p className="stat-card-title">This Month</p>
             <p className="stat-card-value">
               {patients.filter(p => {
-                const created = new Date(p.createdAt)
+                const created = p.createdAtDisplay || getDateObject(p.createdAt)
+                if (!created || typeof created.getMonth !== 'function') return false
                 const now = new Date()
                 return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear()
               }).length}
@@ -286,7 +292,7 @@ export default function PatientList() {
                       
                       <td className="table-cell">
                         <div>
-                          <span className="font-medium">{getAge(patient.dateOfBirth)} years</span>
+                          <span className="font-medium">{getAge(patient)} years</span>
                           {patient.gender && (
                             <span className="text-muted"> • {patient.gender}</span>
                           )}
@@ -294,14 +300,16 @@ export default function PatientList() {
                       </td>
                       
                       <td className="table-cell">
-                        {patient.dateOfBirth ? (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Calendar className="icon-sm text-muted" />
-                            <span>{new Date(patient.dateOfBirth).toLocaleDateString()}</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted">N/A</span>
-                        )}
+                        {(() => {
+                          const dob = patient.dateOfBirthDisplay || getDateObject(patient.dateOfBirth)
+                          if (!dob || (typeof dob.toLocaleDateString !== 'function')) return <span className="text-muted">N/A</span>
+                          return (
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="icon-sm text-muted" />
+                              <span>{dob.toLocaleDateString()}</span>
+                            </div>
+                          )
+                        })()}
                       </td>
                       
                       <td className="table-cell">

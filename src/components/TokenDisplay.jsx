@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { db } from '../firebase/config'
-import { Hash, Clock, User, AlertCircle } from 'lucide-react'
+import { Hash, Clock, AlertCircle } from 'lucide-react'
+import { getDateString } from '../utils/firestoreUtils'
 
 export default function TokenDisplay() {
   const [currentToken, setCurrentToken] = useState(null)
@@ -16,31 +17,30 @@ export default function TokenDisplay() {
     const appointmentsRef = collection(db, 'appointments')
     const q = query(
       appointmentsRef,
-      where('appointmentDate', '==', selectedDate),
       where('status', 'in', ['token_generated', 'in_progress'])
     )
-    
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const appointmentsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
-      
+      const selectedNorm = (selectedDate || '').split('T')[0]
+      const raw = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      const appointmentsData = raw.filter(apt => {
+        const aptDateStr = getDateString(apt.date ?? apt.appointmentDate)
+        return (aptDateStr || '').split('T')[0] === selectedNorm
+      })
+
       const sortedAppointments = appointmentsData.sort((a, b) => {
-        if (a.tokenNumber && b.tokenNumber) {
-          return a.tokenNumber - b.tokenNumber
-        }
-        if (a.tokenNumber) return -1
-        if (b.tokenNumber) return 1
+        if (a.tokenNumber != null && b.tokenNumber != null) return a.tokenNumber - b.tokenNumber
+        if (a.tokenNumber != null) return -1
+        if (b.tokenNumber != null) return 1
         return 0
       })
-      
+
       const current = sortedAppointments.find(apt => apt.status === 'in_progress')
-      setCurrentToken(current)
-      
+      setCurrentToken(current ?? null)
+
       const next = sortedAppointments.find(apt => apt.status === 'token_generated')
-      setNextToken(next)
-      
+      setNextToken(next ?? null)
+
       setLoading(false)
     }, (error) => {
       console.error('Error fetching appointments:', error)
@@ -97,13 +97,13 @@ export default function TokenDisplay() {
                   <span className="text-6xl font-bold text-white">{currentToken.tokenNumber}</span>
                 </div>
                 <div className="text-center">
-                  <h3 className="text-3xl font-bold text-heading mb-2">{currentToken.patientName}</h3>
+                  <h3 className="text-3xl font-bold text-heading mb-2">{currentToken.patientName ?? '—'}</h3>
                   <p className="text-lg text-body mb-2">
-                    {currentToken.patientAge} years, {currentToken.patientGender}
+                    {currentToken.patientAge ?? '—'} years, {currentToken.patientGender ?? '—'}
                   </p>
                   <p className="text-muted flex items-center justify-center gap-2">
                     <Clock className="icon-sm" />
-                    {currentToken.appointmentTime}
+                    {currentToken.appointmentTime ?? '—'}
                   </p>
                 </div>
               </div>
@@ -121,13 +121,13 @@ export default function TokenDisplay() {
                   <span className="text-4xl font-bold text-white">{nextToken.tokenNumber}</span>
                 </div>
                 <div className="text-center">
-                  <h3 className="text-2xl font-bold text-heading mb-2">{nextToken.patientName}</h3>
+                  <h3 className="text-2xl font-bold text-heading mb-2">{nextToken.patientName ?? '—'}</h3>
                   <p className="text-lg text-body mb-2">
-                    {nextToken.patientAge} years, {nextToken.patientGender}
+                    {nextToken.patientAge ?? '—'} years, {nextToken.patientGender ?? '—'}
                   </p>
                   <p className="text-muted flex items-center justify-center gap-2">
                     <Clock className="icon-sm" />
-                    {nextToken.appointmentTime}
+                    {nextToken.appointmentTime ?? '—'}
                   </p>
                 </div>
               </div>

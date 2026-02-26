@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { collection, onSnapshot, query, where, updateDoc, doc, getDoc } from 'firebase/firestore'
 import { db } from '../../../firebase/config'
+gimport { getDateString, getDateObject, getDisplayDate, getDisplayTime } from '../../../utils/firestoreUtils'
 
 export default function TokenQueue() {
   const { currentUser } = useAuth()
@@ -62,7 +63,7 @@ export default function TokenQueue() {
 
   // Fetch appointments for the selected date and doctor
   useEffect(() => {
-    if (!selectedDate || !doctorName) {
+    if (!currentUser?.uid || !selectedDate || !doctorName) {
       return
     }
 
@@ -78,32 +79,27 @@ export default function TokenQueue() {
       )
 
       const unsubscribe = onSnapshot(q, (snapshot) => {
-        const appointmentsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })).filter(apt => {
-          let dateStr = ''
-          if (apt.date && typeof apt.date.toDate === 'function') {
-            dateStr = apt.date.toDate().toISOString().split('T')[0]
-          } else if (apt.date && typeof apt.date === 'string') {
-            dateStr = apt.date.split('T')[0]
-          } else if (apt.appointmentDate) {
-            dateStr = apt.appointmentDate
-          }
-          return dateStr === selectedDate
-        })
+        const selectedNorm = (selectedDate || '').split('T')[0]
+        const raw = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+        const appointmentsData = raw
+          .filter(apt => {
+            const dateStr = getDateString(apt.date ?? apt.appointmentDate)
+            return (dateStr || '').split('T')[0] === selectedNorm
+          })
+          .map(apt => ({
+            ...apt,
+            appointmentDateDisplay: getDisplayDate(apt.date ?? apt.appointmentDate) || apt.appointmentDate || '',
+            appointmentTimeDisplay: getDisplayTime(apt.appointmentTime ?? apt.time) || apt.appointmentTime || ''
+          }))
 
         // Sort by token number if available, otherwise by creation time
         const sortedAppointments = appointmentsData.sort((a, b) => {
-          if (a.tokenNumber && b.tokenNumber) {
-            return a.tokenNumber - b.tokenNumber
-          }
-          if (a.tokenNumber) return -1
-          if (b.tokenNumber) return 1
-          // Parse dates for comparison
-          const dateA = new Date(a.createdAt || 0)
-          const dateB = new Date(b.createdAt || 0)
-          return dateA - dateB
+          if (a.tokenNumber != null && b.tokenNumber != null) return a.tokenNumber - b.tokenNumber
+          if (a.tokenNumber != null) return -1
+          if (b.tokenNumber != null) return 1
+          const dateA = getDateObject(a.createdAt) || new Date(0)
+          const dateB = getDateObject(b.createdAt) || new Date(0)
+          return (dateA?.getTime?.() || 0) - (dateB?.getTime?.() || 0)
         })
 
         setAppointments(sortedAppointments)
@@ -130,7 +126,7 @@ export default function TokenQueue() {
       setLoading(false)
       toast.error('Error loading appointments')
     }
-  }, [selectedDate, doctorName])
+  }, [selectedDate, doctorName, currentUser?.uid])
 
 
 
@@ -139,10 +135,11 @@ export default function TokenQueue() {
     let filtered = appointments
 
     if (searchTerm) {
+      const term = (searchTerm || '').toLowerCase().trim()
       filtered = filtered.filter(appointment =>
-        appointment.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        appointment.patientPhone.includes(searchTerm) ||
-        (appointment.tokenNumber && appointment.tokenNumber.toString().includes(searchTerm))
+        (appointment.patientName || '').toLowerCase().includes(term) ||
+        (appointment.patientPhone || '').includes(searchTerm) ||
+        (appointment.tokenNumber != null && String(appointment.tokenNumber).includes(searchTerm))
       )
     }
 
@@ -479,11 +476,11 @@ export default function TokenQueue() {
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 text-sm">
                               <Calendar className="icon-sm text-muted" />
-                              <span>{appointment.appointmentDate}</span>
+                              <span>{appointment.appointmentDateDisplay ?? appointment.appointmentDate ?? '—'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm">
                               <Clock className="icon-sm text-muted" />
-                              <span className="text-muted">{appointment.appointmentTime}</span>
+                              <span className="text-muted">{appointment.appointmentTimeDisplay ?? appointment.appointmentTime ?? '—'}</span>
                             </div>
                           </div>
                         </td>

@@ -28,6 +28,7 @@ import {
 import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore'
 import { db } from '../../../firebase/config'
 import { downloadPrescriptionPDF } from './PrescriptionPdfGenerator'
+import { getDateString, getDateObject } from '../../../utils/firestoreUtils'
 
 export default function ReceptionistPrescriptions() {
   const { currentUser } = useAuth()
@@ -41,20 +42,26 @@ export default function ReceptionistPrescriptions() {
   const [loading, setLoading] = useState(false)
   const [doctors, setDoctors] = useState([])
 
-  // Fetch prescriptions
+  // Fetch prescriptions (client-side sort to handle mixed createdAt: string vs Timestamp)
   useEffect(() => {
     if (!currentUser) return
 
     setLoading(true)
 
     const prescriptionsRef = collection(db, 'prescriptions')
-    const q = query(prescriptionsRef, orderBy('createdAt', 'desc'))
+    const q = query(prescriptionsRef)
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const prescriptionsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
+      const raw = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      const prescriptionsData = raw.map(p => ({
+        ...p,
+        prescriptionDate: getDateString(p.date ?? p.prescriptionDate) || p.prescriptionDate || ''
       }))
+      prescriptionsData.sort((a, b) => {
+        const dateA = getDateObject(a.createdAt) || new Date(0)
+        const dateB = getDateObject(b.createdAt) || new Date(0)
+        return dateB - dateA
+      })
       setPrescriptions(prescriptionsData)
       setLoading(false)
 
@@ -72,71 +79,68 @@ export default function ReceptionistPrescriptions() {
     return () => unsubscribe()
   }, [currentUser])
 
-  // Fetch doctors
+  // Fetch doctors (doc id is uid, used for filter by doctorId)
   useEffect(() => {
-    const fetchDoctors = async () => {
-      try {
-        const staffRef = collection(db, 'staffData')
-        const staffQuery = query(staffRef, where('role', '==', 'doctor'))
-
-        const unsubscribe = onSnapshot(staffQuery, (snapshot) => {
-          const doctorsData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }))
-          setDoctors(doctorsData)
-        })
-
-        return () => unsubscribe()
-      } catch (error) {
-        console.error('Error fetching doctors:', error)
-      }
-    }
-
-    fetchDoctors()
+    const staffRef = collection(db, 'staffData')
+    const staffQuery = query(staffRef, where('role', '==', 'doctor'))
+    const unsubscribe = onSnapshot(staffQuery, (snapshot) => {
+      const doctorsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        uid: doc.id,
+        ...doc.data()
+      }))
+      setDoctors(doctorsData)
+    })
+    return () => unsubscribe()
   }, [])
 
   useEffect(() => {
     let filtered = prescriptions
 
-    // Filter by date based on view mode
+    // Normalize selected date for comparison (YYYY-MM-DD)
+    const selectedNorm = selectedDate.split('T')[0]
+
+    // Filter by date based on view mode (use normalized prescriptionDate)
     if (viewMode === 'today') {
-      filtered = filtered.filter(prescription => prescription.prescriptionDate === selectedDate)
+      filtered = filtered.filter(p => (p.prescriptionDate || '').split('T')[0] === selectedNorm)
     } else if (viewMode === 'week') {
-      const startOfWeek = new Date(selectedDate)
-      const endOfWeek = new Date(selectedDate)
+      const startOfWeek = new Date(selectedNorm)
+      const endOfWeek = new Date(selectedNorm)
       endOfWeek.setDate(endOfWeek.getDate() + 7)
-      filtered = filtered.filter(prescription => {
-        const prescriptionDate = new Date(prescription.prescriptionDate)
-        return prescriptionDate >= startOfWeek && prescriptionDate < endOfWeek
+      filtered = filtered.filter(p => {
+        const d = getDateObject(p.date ?? p.prescriptionDate) || new Date(p.prescriptionDate)
+        if (!d || isNaN(d.getTime())) return false
+        return d >= startOfWeek && d < endOfWeek
       })
     } else if (viewMode === 'month') {
-      const startOfMonth = new Date(selectedDate)
-      const endOfMonth = new Date(selectedDate)
+      const startOfMonth = new Date(selectedNorm)
+      const endOfMonth = new Date(selectedNorm)
       endOfMonth.setMonth(endOfMonth.getMonth() + 1)
-      filtered = filtered.filter(prescription => {
-        const prescriptionDate = new Date(prescription.prescriptionDate)
-        return prescriptionDate >= startOfMonth && prescriptionDate < endOfMonth
+      filtered = filtered.filter(p => {
+        const d = getDateObject(p.date ?? p.prescriptionDate) || new Date(p.prescriptionDate)
+        if (!d || isNaN(d.getTime())) return false
+        return d >= startOfMonth && d < endOfMonth
       })
     }
 
     // Filter by search term
     if (searchTerm) {
+      const term = searchTerm.toLowerCase()
       filtered = filtered.filter(prescription =>
-        prescription.patientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        prescription.doctorName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        prescription.diagnosis?.toLowerCase().includes(searchTerm.toLowerCase())
+        (prescription.patientName || '').toLowerCase().includes(term) ||
+        (prescription.doctorName || '').toLowerCase().includes(term) ||
+        (prescription.diagnosis || '').toLowerCase().includes(term)
       )
     }
 
     // Filter by status
     if (filterStatus !== 'all') {
-      filtered = filtered.filter(prescription => prescription.status === filterStatus)
+      filtered = filtered.filter(prescription => (prescription.status || '') === filterStatus)
     }
 
-    // Filter by doctor
+    // Filter by doctor (use doctorId to sync with staffData; dropdown value is uid)
     if (filterDoctor !== 'all') {
-      filtered = filtered.filter(prescription => prescription.doctorName === filterDoctor)
+      filtered = filtered.filter(prescription => (prescription.doctorId || '') === filterDoctor)
     }
 
     setFilteredPrescriptions(filtered)
@@ -214,7 +218,10 @@ export default function ReceptionistPrescriptions() {
     }
   }
 
-  const todayPrescriptions = filteredPrescriptions.filter(prescription => prescription.prescriptionDate === selectedDate)
+  const selectedNorm = (selectedDate || '').split('T')[0]
+  const todayPrescriptions = filteredPrescriptions.filter(
+    prescription => (prescription.prescriptionDate || '').split('T')[0] === selectedNorm
+  )
 
   return (
     <div className="dashboard-container">
@@ -282,7 +289,7 @@ export default function ReceptionistPrescriptions() {
                 <option value="pending">Pending</option>
               </select>
 
-              {/* Doctor Filter */}
+              {/* Doctor Filter (value = uid for reliable sync) */}
               <select
                 value={filterDoctor}
                 onChange={(e) => setFilterDoctor(e.target.value)}
@@ -290,7 +297,7 @@ export default function ReceptionistPrescriptions() {
               >
                 <option value="all">All Doctors</option>
                 {doctors.map(doctor => (
-                  <option key={doctor.id} value={doctor.fullName}>{doctor.fullName}</option>
+                  <option key={doctor.id} value={doctor.id}>{doctor.fullName || doctor.email || 'Doctor'}</option>
                 ))}
               </select>
 
