@@ -32,14 +32,13 @@ import { getAuth, connectAuthEmulator } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDY3jg8FWjpoZeq5wrlTO60S-4orEpUuJs",
-  authDomain: "life-clinic-management-s-a2493.firebaseapp.com",
-  projectId: "life-clinic-management-s-a2493",
-  storageBucket: "life-clinic-management-s-a2493.firebasestorage.app",
-  messagingSenderId: "631263753154",
-  appId: "1:631263753154:web:540b8f99ebd69ffbab1c5b"
+  apiKey: "AIzaSyB-72oeIGetQLSMtuJ0nxAwFkiiXGnLNZc",
+  authDomain: "clinic-management-system-551f5.firebaseapp.com",
+  projectId: "clinic-management-system-551f5",
+  storageBucket: "clinic-management-system-551f5.firebasestorage.app",
+  messagingSenderId: "720768878063",
+  appId: "1:720768878063:web:f346dff16b435a00d1a21a"
 };
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 

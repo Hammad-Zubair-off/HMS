@@ -450,6 +450,237 @@ Document ID = Auto-generated
 
 ---
 
+## About Document IDs
+
+There are two types of document IDs in this project:
+
+- **Auto-generated**: Firestore creates a random ID like `aB3xK9mPqR2wN5vL`. In Firebase Console, click the **"Auto-ID"** button when creating a document. In code, `addDoc()` handles this automatically. Used by: `patients`, `appointments`, `prescriptions`, `medicines`, `invoices`, `payments`.
+
+- **Manual (Auth UID)**: You must type the ID yourself. Only `staffData` uses this - the document ID **must exactly match** the user's Firebase Auth UID (e.g. `fPu3Bg831WfbnSqJKyhH0PtSfUr8`). Find the UID in **Authentication > Users** tab.
+
+---
+
+## Dummy Data - Ready to Paste into Firebase Console
+
+Below is one sample document for each collection. Use these to get started.
+
+### staffData - Doctor (Document ID = copy UID from Auth > Users)
+
+```
+Document ID: (paste doctor's Auth UID here)
+
+uid             (string)    →  (same Auth UID)
+email           (string)    →  doctor1@gmail.com
+fullName        (string)    →  Dr. Ahmed Khan
+role            (string)    →  doctor
+emailVerified   (boolean)   →  true
+createdAt       (string)    →  2026-01-01T00:00:00.000Z
+lastLogin       (string)    →  2026-02-26T09:00:00.000Z
+specialization  (string)    →  General Medicine
+```
+
+### staffData - Receptionist (Document ID = copy UID from Auth > Users)
+
+```
+Document ID: (paste receptionist's Auth UID here)
+
+uid             (string)    →  (same Auth UID)
+email           (string)    →  receptionist1@gmail.com
+fullName        (string)    →  Sarah Johnson
+role            (string)    →  receptionist
+emailVerified   (boolean)   →  true
+createdAt       (string)    →  2026-01-01T00:00:00.000Z
+lastLogin       (string)    →  2026-02-26T09:00:00.000Z
+```
+
+### patients (Document ID = click Auto-ID)
+
+```
+Document ID: (click Auto-ID)
+
+fullName                (string)    →  John Doe
+phone                   (string)    →  03001234567
+email                   (string)    →  john.doe@example.com
+dateOfBirth             (string)    →  1990-05-15
+gender                  (string)    →  Male
+address                 (string)    →  123 Main Street, Lahore
+city                    (string)    →  Lahore
+state                   (string)    →  Punjab
+zipCode                 (string)    →  54000
+bloodGroup              (string)    →  O+
+allergies               (string)    →  Penicillin
+medicalHistory          (string)    →  Hypertension since 2020
+medications             (string)    →  Amlodipine 5mg daily
+emergencyContactName    (string)    →  Jane Doe
+emergencyContactPhone   (string)    →  03009876543
+emergencyContactRelation(string)    →  Wife
+insuranceProvider       (string)    →  State Life Insurance
+insurancePolicyNumber   (string)    →  SLI-2026-78901
+notes                   (string)    →  Regular follow-up patient
+status                  (string)    →  active
+patientId               (string)    →  PAT-A1B2C3
+createdAt               (string)    →  2026-01-15T10:30:00.000Z
+createdBy               (string)    →  (receptionist's Auth UID)
+```
+
+### medicines (Document ID = click Auto-ID)
+
+```
+Document ID: (click Auto-ID)
+
+name                (string)    →  Amoxicillin
+category            (string)    →  Antibiotic
+strength            (string)    →  500mg
+form                (string)    →  Capsule
+manufacturer        (string)    →  PharmaCo Ltd.
+description         (string)    →  Broad-spectrum antibiotic
+sideEffects         (string)    →  Nausea, diarrhea, rash
+contraindications   (string)    →  Penicillin allergy
+dosageInstructions  (string)    →  Take with food, complete full course
+storageInstructions (string)    →  Store below 25C, keep dry
+price               (number)    →  15
+stockQuantity       (number)    →  200
+reorderLevel        (number)    →  50
+isActive            (boolean)   →  true
+createdAt           (string)    →  2026-01-10T08:00:00.000Z
+```
+
+### appointments (Document ID = click Auto-ID)
+
+```
+Document ID: (click Auto-ID)
+
+patientId       (string)    →  (paste patient's Auto-ID from above)
+patientName     (string)    →  John Doe
+patientPhone    (string)    →  03001234567
+patientEmail    (string)    →  john.doe@example.com
+patientAge      (string)    →  35
+patientGender   (string)    →  Male
+doctorId        (string)    →  (paste doctor's Auth UID)
+doctorName      (string)    →  Dr. Ahmed Khan
+appointmentDate (string)    →  2026-02-26
+appointmentTime (string)    →  11:00
+appointmentType (string)    →  consultation
+status          (string)    →  scheduled
+symptoms        (string)    →  Persistent cough, mild fever for 3 days
+notes           (string)    →  Patient referred by Dr. Ali
+medicalHistory  (string)    →  Hypertension since 2020
+medications     (string)    →  Amlodipine 5mg daily
+vitalSigns      (map)       →  (add as sub-fields below)
+  bloodPressure (string)    →  130/85
+  heartRate     (string)    →  78 bpm
+  temperature   (string)    →  99.2F
+  weight        (string)    →  75 kg
+createdAt       (string)    →  2026-02-26T08:30:00.000Z
+createdBy       (string)    →  (receptionist's Auth UID)
+```
+
+### prescriptions (Document ID = click Auto-ID)
+
+```
+Document ID: (click Auto-ID)
+
+patientId        (string)    →  (paste patient's Auto-ID)
+patientName      (string)    →  John Doe
+patientAge       (string)    →  35
+patientGender    (string)    →  Male
+patientPhone     (string)    →  03001234567
+patientEmail     (string)    →  john.doe@example.com
+doctorId         (string)    →  (paste doctor's Auth UID)
+doctorName       (string)    →  Dr. Ahmed Khan
+prescriptionDate (string)    →  2026-02-26
+diagnosis        (string)    →  Upper respiratory tract infection
+symptoms         (string)    →  Persistent cough, mild fever
+instructions     (string)    →  Rest for 3 days, drink plenty of fluids
+followUpDate     (string)    →  2026-03-05
+status           (string)    →  active
+notes            (string)    →  Patient advised to return if fever exceeds 102F
+createdAt        (string)    →  2026-02-26T11:30:00.000Z
+medicines        (array)     →  (add array with one map entry below)
+  [0]            (map)
+    id           (string)    →  (paste medicine's Auto-ID from above)
+    name         (string)    →  Amoxicillin
+    category     (string)    →  Antibiotic
+    dosage       (string)    →  500mg
+    frequency    (string)    →  3 times a day
+    duration     (string)    →  7 days
+    timing       (string)    →  After meals
+    specialInstructions (string) →  Complete the full course
+```
+
+### invoices (Document ID = click Auto-ID)
+
+```
+Document ID: (click Auto-ID)
+
+invoiceNumber   (string)    →  INV-1740000000001
+patientId       (string)    →  (paste patient's Auto-ID)
+patientName     (string)    →  John Doe
+patientPhone    (string)    →  03001234567
+patientEmail    (string)    →  john.doe@example.com
+patientAddress  (string)    →  123 Main Street, Lahore
+invoiceDate     (string)    →  2026-02-26
+dueDate         (string)    →  2026-03-05
+subtotal        (number)    →  2500
+taxRate         (number)    →  18
+taxAmount       (number)    →  450
+discount        (number)    →  0
+totalAmount     (number)    →  2950
+notes           (string)    →  Follow-up consultation included
+terms           (string)    →  Payment due within 7 days
+status          (string)    →  pending
+createdAt       (timestamp) →  (click timestamp type, pick current date)
+items           (array)     →  (add array with map entries below)
+  [0]           (map)
+    description (string)    →  General Consultation
+    quantity    (number)    →  1
+    unitPrice   (number)    →  1500
+    amount      (number)    →  1500
+  [1]           (map)
+    description (string)    →  Blood Test - CBC
+    quantity    (number)    →  1
+    unitPrice   (number)    →  1000
+    amount      (number)    →  1000
+```
+
+### payments (Document ID = click Auto-ID)
+
+```
+Document ID: (click Auto-ID)
+
+invoiceId       (string)    →  (paste invoice's Auto-ID from above)
+invoiceNumber   (string)    →  INV-1740000000001
+patientName     (string)    →  John Doe
+patientPhone    (string)    →  03001234567
+amount          (number)    →  2950
+method          (string)    →  cash
+reference       (string)    →  RCPT-20260226-001
+notes           (string)    →  Paid in full at reception
+processedBy     (string)    →  receptionist
+processedAt     (timestamp) →  (click timestamp type, pick current date)
+status          (string)    →  completed
+```
+
+---
+
+### How to Add Nested Fields in Firebase Console
+
+**For `map` types** (like `vitalSigns`):
+1. Click **"Add field"**
+2. Set the field name (e.g. `vitalSigns`)
+3. Change the type dropdown to **"map"**
+4. Click the **"+"** icon next to the map to add sub-fields inside it
+
+**For `array` types** (like `medicines`, `items`):
+1. Click **"Add field"**
+2. Set the field name (e.g. `medicines`)
+3. Change the type dropdown to **"array"**
+4. Click the **"+"** icon to add an element
+5. Change the element type to **"map"**
+6. Click the **"+"** icon inside the map to add key-value pairs
+
+---
+
 ## 7. Firestore Security Rules
 
 ### Development Rules (current - open access)
