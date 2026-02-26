@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { collection, onSnapshot, query, where, updateDoc, doc, getDoc } from 'firebase/firestore'
 import { db } from '../../../firebase/config'
-gimport { getDateString, getDateObject, getDisplayDate, getDisplayTime } from '../../../utils/firestoreUtils'
+import { getDateString, getDateObject, getDisplayDate, getDisplayTime } from '../../../utils/firestoreUtils'
 
 export default function TokenQueue() {
   const { currentUser } = useAuth()
