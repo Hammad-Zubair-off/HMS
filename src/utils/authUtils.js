@@ -16,21 +16,7 @@ export async function createUserWithRole(email, password, fullName, role) {
     displayName: fullName
   })
 
-  const actionCodeSettings = {
-    url: `${window.location.origin}/login`,
-    handleCodeInApp: true,
-    iOS: {
-      bundleId: 'com.clinicmanagement.app'
-    },
-    android: {
-      packageName: 'com.clinicmanagement.app',
-      installApp: true,
-      minimumVersion: '12'
-    },
-    dynamicLinkDomain: import.meta.env.VITE_FIREBASE_DYNAMIC_LINK_DOMAIN || undefined
-  }
-
-  await sendEmailVerification(user, actionCodeSettings)
+  await sendEmailVerification(user)
 
   await setDoc(doc(db, 'staffData', user.uid), {
     uid: user.uid,
